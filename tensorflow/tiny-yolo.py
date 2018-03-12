@@ -9,7 +9,6 @@ import tensorflow as tf
 from darkflow.net.build import TFNet
 
 images = '../sample_img/'
-images = '/home/domen/smb/'
 use_camera = False
 
 
