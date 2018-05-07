@@ -3,6 +3,7 @@
 .autopilot/
 csim/
 syn/
+impl/
 !.gitignore
 !*.cpp
 !*.h

@@ -62,3 +62,119 @@ void conv2d(hls::stream<T> &in, hls::stream<T> &out, hls::stream<T> &weights) {
 		}
 	}
 }
+
+template <typename T, int WIDTH, int HEIGHT>
+void max_pool(hls::stream<T> &in, hls::stream<T> &out) {
+	T buffer[WIDTH/2];
+	T tmp;
+	for (int i = 0; i < HEIGHT; i++) {
+		for (int j = 0; j < WIDTH; j++) {
+			tmp = in.read();
+			if ((i & 1) == 0) {
+				if ((j & 1) == 0) {
+					buffer[j/2] = tmp;
+				} else {
+					if (tmp > buffer[j/2]) {
+						buffer[j/2] = tmp;
+					}
+				}
+			} else {
+				if ((j & 1) == 0) {
+					if (tmp > buffer[j/2]) {
+						buffer[j/2] = tmp;
+					}
+				} else {
+					if (tmp > buffer[j/2]) {
+						buffer[j/2] = tmp;
+					}
+					out.write(buffer[j/2]);
+				}
+			}
+		}
+	}
+}
+
+template <typename T, int WIDTH, int HEIGHT>
+void batch_norm(hls::stream<T> &in, hls::stream<T> &out, T scale, T add) {
+	for (int i = 0; i < HEIGHT; i++) {
+		for (int j = 0; j < WIDTH; j++) {
+			T tmp = in.read();
+			tmp *= scale;
+			tmp += add;
+			out.write(tmp);
+		}
+	}
+}
+
+template <typename T, int WIDTH, int HEIGHT>
+void leaky_relu(hls::stream<T> &in, hls::stream<T> &out) {
+	T tmp;
+	for (int i = 0; i < HEIGHT; i++) {
+		for (int j = 0; j < WIDTH; j++) {
+			tmp = in.read();
+			if (tmp < 0) {
+				tmp *= T(0.1);
+			}
+			out.write(tmp);
+		}
+	}
+}
+
+template <typename T, int LAYERS, int WIDTH, int HEIGHT>
+void full_layer(hls::stream<T> &in, hls::stream<T> &out, hls::stream<T> &weights, T scale, T add) {
+#pragma HLS DATAFLOW
+	hls::stream<T> conv_out;
+	hls::stream<T> batch_out;
+	hls::stream<T> leaky_out;
+
+	conv2d<T, LAYERS, WIDTH, HEIGHT>(in, conv_out, weights);
+	batch_norm<T, WIDTH, HEIGHT>(conv_out, batch_out, scale, add);
+	leaky_relu<T, WIDTH, HEIGHT>(batch_out, leaky_out);
+	max_pool<T, WIDTH, HEIGHT>(leaky_out, out);
+}
+
+template <typename T, int IN_LAYERS, int OUT_LAYERS, int WIDTH, int HEIGHT>
+void full_layer_stack(hls::stream<T> &in, hls::stream<T> &out, hls::stream<T> &weights) {
+	hls::stream<T> layer_in[OUT_LAYERS];
+	hls::stream<T> layer_out[OUT_LAYERS];
+	hls::stream<T> layer_weights[OUT_LAYERS];
+
+	broadcast<T, OUT_LAYERS, WIDTH*HEIGHT*IN_LAYERS>(in, layer_in);
+	split<T, OUT_LAYERS, 2+3*3*IN_LAYERS>(weights, layer_weights);
+
+	for (int l = 0; l < OUT_LAYERS; l++) {
+		// TODO: unroll
+		full_layer(layer_in[l], layer_out[l], layer_weights[l]);
+	}
+
+	join<T, OUT_LAYERS, WIDTH/2*HEIGHT/2>(out, layer_out);
+}
+
+template <typename T, int LAYERS, int SIZE>
+void broadcast(hls::stream<T> &in, hls::stream<T> outs[LAYERS]) {
+	T tmp;
+	for (int i = 0; i < SIZE; i++) {
+		tmp = in.read();
+		for (int l = 0; l < LAYERS; l++) {
+			outs[l].write(tmp);
+		}
+	}
+}
+
+template <typename T, int LAYERS, int SIZE>
+void split(hls::stream<T> &in, hls::stream<T> outs[LAYERS]) {
+	for (int i = 0; i < SIZE; i++) {
+		for (int l = 0; l < LAYERS; l++) {
+			outs[l].write(in.read());
+		}
+	}
+}
+
+template <typename T, int LAYERS, int SIZE>
+void join(hls::stream<T> &out, hls::stream<T> ins[LAYERS]) {
+	for (int i = 0; i < SIZE; i++) {
+		for (int l = 0; l < LAYERS; l++) {
+			out.write(ins[l].read());
+		}
+	}
+}

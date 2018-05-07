@@ -41,14 +41,12 @@ with tfnet.graph.as_default():
         conv1,
         _get_var(0, 'moving_mean'),
         _get_var(0, 'moving_variance'),
-        offset=None,
+        offset=layers[0].w['biases'],
         scale=_get_var(0, 'gamma'),
         variance_epsilon=1e-5,
     )
 
-    biased1 = tf.nn.bias_add(batch1, layers[0].w['biases'])
-
-    leaky1 = tf.nn.leaky_relu(biased1, alpha=.1)
+    leaky1 = tf.nn.leaky_relu(batch1, alpha=.1)
 
     maxpool1 = tf.nn.max_pool(
         leaky1,
@@ -65,14 +63,12 @@ with tfnet.graph.as_default():
         conv2,
         _get_var(3, 'moving_mean'),
         _get_var(3, 'moving_variance'),
-        offset=None,
+        offset=layers[3].w['biases'],
         scale=_get_var(3, 'gamma'),
         variance_epsilon=1e-5,
     )
 
-    biased2 = tf.nn.bias_add(batch2, layers[3].w['biases'])
-
-    leaky2 = tf.nn.leaky_relu(biased2, alpha=.1)
+    leaky2 = tf.nn.leaky_relu(batch2, alpha=.1)
 
     maxpool2 = tf.nn.max_pool(
         leaky2,
@@ -89,14 +85,12 @@ with tfnet.graph.as_default():
         conv3,
         _get_var(6, 'moving_mean'),
         _get_var(6, 'moving_variance'),
-        offset=None,
+        offset=layers[6].w['biases'],
         scale=_get_var(6, 'gamma'),
         variance_epsilon=1e-5,
     )
 
-    biased3 = tf.nn.bias_add(batch3, layers[6].w['biases'])
-
-    leaky3 = tf.nn.leaky_relu(biased3, alpha=.1)
+    leaky3 = tf.nn.leaky_relu(batch3, alpha=.1)
 
     maxpool3 = tf.nn.max_pool(
         leaky3,
@@ -113,14 +107,12 @@ with tfnet.graph.as_default():
         conv4,
         _get_var(9, 'moving_mean'),
         _get_var(9, 'moving_variance'),
-        offset=None,
+        offset=layers[9].w['biases'],
         scale=_get_var(9, 'gamma'),
         variance_epsilon=1e-5,
     )
 
-    biased4 = tf.nn.bias_add(batch4, layers[9].w['biases'])
-
-    leaky4 = tf.nn.leaky_relu(biased4, alpha=.1)
+    leaky4 = tf.nn.leaky_relu(batch4, alpha=.1)
 
     maxpool4 = tf.nn.max_pool(
         leaky4,
@@ -137,14 +129,12 @@ with tfnet.graph.as_default():
         conv5,
         _get_var(12, 'moving_mean'),
         _get_var(12, 'moving_variance'),
-        offset=None,
+        offset=layers[12].w['biases'],
         scale=_get_var(12, 'gamma'),
         variance_epsilon=1e-5,
     )
 
-    biased5 = tf.nn.bias_add(batch5, layers[12].w['biases'])
-
-    leaky5 = tf.nn.leaky_relu(biased5, alpha=.1)
+    leaky5 = tf.nn.leaky_relu(batch5, alpha=.1)
 
     maxpool5 = tf.nn.max_pool(
         leaky5,
@@ -161,14 +151,12 @@ with tfnet.graph.as_default():
         conv6,
         _get_var(15, 'moving_mean'),
         _get_var(15, 'moving_variance'),
-        offset=None,
+        offset=layers[15].w['biases'],
         scale=_get_var(15, 'gamma'),
         variance_epsilon=1e-5,
     )
 
-    biased6 = tf.nn.bias_add(batch6, layers[15].w['biases'])
-
-    leaky6 = tf.nn.leaky_relu(biased6, alpha=.1)
+    leaky6 = tf.nn.leaky_relu(batch6, alpha=.1)
 
     maxpool6 = tf.nn.max_pool(
         leaky6,
@@ -185,14 +173,12 @@ with tfnet.graph.as_default():
         conv7,
         _get_var(18, 'moving_mean'),
         _get_var(18, 'moving_variance'),
-        offset=None,
+        offset=layers[18].w['biases'],
         scale=_get_var(18, 'gamma'),
         variance_epsilon=1e-5,
     )
 
-    biased7 = tf.nn.bias_add(batch7, layers[18].w['biases'])
-
-    leaky7 = tf.nn.leaky_relu(biased7, alpha=.1)
+    leaky7 = tf.nn.leaky_relu(batch7, alpha=.1)
 
     conv8 = tf.nn.conv2d(
         leaky7, layers[20].w['kernel'],
@@ -202,14 +188,12 @@ with tfnet.graph.as_default():
         conv8,
         _get_var(20, 'moving_mean'),
         _get_var(20, 'moving_variance'),
-        offset=None,
+        offset=layers[20].w['biases'],
         scale=_get_var(20, 'gamma'),
         variance_epsilon=1e-5,
     )
 
-    biased8 = tf.nn.bias_add(batch8, layers[20].w['biases'])
-
-    leaky8 = tf.nn.leaky_relu(biased8, alpha=.1)
+    leaky8 = tf.nn.leaky_relu(batch8, alpha=.1)
 
     conv9 = tf.nn.conv2d(
         leaky8, layers[22].w['kernel'],

@@ -5,9 +5,29 @@
 #include <hls_video.h>
 #include <hls_half.h>
 
-typedef ap_fixed<18, 5, AP_TRN, AP_SAT> decimal_t;
+typedef float decimal_t;
+//typedef ap_fixed<18, 5, AP_TRN, AP_SAT> decimal_t;
 
 void cnn(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights);
+
+template <typename T, int LAYERS, int WIDTH, int HEIGHT>
+void conv2d(hls::stream<T> &in, hls::stream<T> &out, hls::stream<T> &weights);
+template <typename T, int WIDTH, int HEIGHT>
+void max_pool(hls::stream<T> &in, hls::stream<T> &out);
+template <typename T, int WIDTH, int HEIGHT>
+void batch_norm(hls::stream<T> &in, hls::stream<T> &out, T scale, T add);
+template <typename T, int WIDTH, int HEIGHT>
+void leaky_relu(hls::stream<T> &in, hls::stream<T> &out);
+template <typename T, int LAYERS, int WIDTH, int HEIGHT>
+void full_layer(hls::stream<T> &in, hls::stream<T> &out, hls::stream<T> &weights, T scale, T add);
+template <typename T, int IN_LAYERS, int OUT_LAYERS, int WIDTH, int HEIGHT>
+void full_layer_stack(hls::stream<T> &in, hls::stream<T> &out, hls::stream<T> &weights);
+template <typename T, int LAYERS, int SIZE>
+void broadcast(hls::stream<T> &in, hls::stream<T> outs[LAYERS]);
+template <typename T, int LAYERS, int SIZE>
+void split(hls::stream<T> &in, hls::stream<T> outs[LAYERS]);
+template <typename T, int LAYERS, int SIZE>
+void join(hls::stream<T> &out, hls::stream<T> ins[LAYERS]);
 
 #include "cnn_impl.h"
 
