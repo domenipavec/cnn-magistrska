@@ -1,0 +1,9 @@
+*
+!*/
+.autopilot/
+csim/
+syn/
+!.gitignore
+!*.cpp
+!*.h
+!*.tcl
