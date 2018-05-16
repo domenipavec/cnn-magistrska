@@ -11,24 +11,26 @@ void cnn(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<de
 	hls::stream<decimal_t> layer6_out("layer6_out");
 	hls::stream<decimal_t> layer7_out("layer7_out");
 	hls::stream<decimal_t> layer8_out("layer8_out");
+	hls::stream<decimal_t> layer_weights[6];
+	split<decimal_t, 6, 128>(weights, layer_weights);
 
 	// layer 1
-	full_layer_stack<decimal_t, 3, 16, 416, 416>(in, layer1_out, weights);
+	full_layer_stack<decimal_t, 3, 16, 416, 416>(in, layer1_out, layer_weights[0]);
 
 	// layer 2
-	full_layer_stack<decimal_t, 16, 32, 208, 208>(layer1_out, layer2_out, weights);
+	full_layer_stack<decimal_t, 16, 32, 208, 208>(layer1_out, layer2_out, layer_weights[1]);
 
 	// layer 3
-	full_layer_stack<decimal_t, 32, 64, 104, 104>(layer2_out, layer3_out, weights);
+	full_layer_stack<decimal_t, 32, 64, 104, 104>(layer2_out, layer3_out, layer_weights[2]);
 
 	// layer 4
-	full_layer_stack<decimal_t, 64, 128, 52, 52>(layer3_out, layer4_out, weights);
+	full_layer_stack<decimal_t, 64, 128, 52, 52>(layer3_out, layer4_out, layer_weights[3]);
 
 	// layer 5
-	full_layer_stack<decimal_t, 128, 256, 26, 26>(layer4_out, layer5_out, weights);
+	full_layer_stack<decimal_t, 128, 256, 26, 26>(layer4_out, layer5_out, layer_weights[4]);
 
 	// layer 6
-	full_layer_stack<decimal_t, 256, 512, 13, 13>(layer5_out, layer6_out, weights);
+	full_layer_stack<decimal_t, 256, 512, 13, 13>(layer5_out, layer6_out, layer_weights[5]);
 
 //	// layer 7
 //	fully_connected<decimal_t, 3, 16, 416, 416>(layer6_out, layer7_out, weights);

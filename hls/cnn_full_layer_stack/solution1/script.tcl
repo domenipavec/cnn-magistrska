@@ -5,9 +5,9 @@
 ############################################################
 open_project cnn_full_layer_stack
 set_top cnn_full_layer_stack
-add_files cnn_impl.h
-add_files cnn.h
 add_files cnn.cpp
+add_files cnn.h
+add_files cnn_impl.h
 add_files -tb cnn_full_layer_stack/cnn_full_layer_stack_test.cpp
 open_solution "solution1"
 set_part {xc7z020clg484-1} -tool vivado
