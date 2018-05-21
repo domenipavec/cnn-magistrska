@@ -46,3 +46,7 @@ void cnn(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<de
 void cnn_full_layer_stack(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights) {
 	full_layer_stack<decimal_t, 3, 16, 416, 416>(in, out, weights);
 }
+
+void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights) {
+	general_conv2d<decimal_t, 128, 3328>(in, out, weights, 3, 416, 416);
+}

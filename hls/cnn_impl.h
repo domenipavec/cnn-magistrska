@@ -184,3 +184,74 @@ void join(hls::stream<T> &out, hls::stream<T> ins[LAYERS]) {
 		}
 	}
 }
+
+template <typename T, int MAX_LAYERS, int MAX_LINE>
+void general_conv2d(hls::stream<T> &in, hls::stream<T> &out, hls::stream<T> &win, int layers, int width, int height) {
+	hls::Window<3, 3*MAX_LAYERS, T> weights;
+	for (int i = 0; i < 3; i++) {
+		for (int l = 0; l < 3*MAX_LAYERS; l++) {
+			weights.insert_pixel(T(0), i, l);
+		}
+	}
+
+	for (int i = 0; i < 3; i++) {
+		for (int l = 0; l < 3*MAX_LAYERS; l++) {
+			weights.insert_pixel(win.read(), i, l);
+		}
+	}
+
+	// line buffer width = width*layers and is constant for layers 2 to 6
+	hls::LineBuffer<2, MAX_LINE, T> line_buffer;
+	hls::Window<3, 3*MAX_LAYERS, T> window_buffer;
+
+	// init top padding
+	for (int j = 0; j < MAX_LINE; j++) {
+		line_buffer.insert_bottom_row(0, j);
+	}
+
+	// init window to 0 for left padding
+	for (int i = 0; i < 3; i++) {
+		for (int l = 0; l < 3*MAX_LAYERS; l++) {
+			window_buffer.insert_pixel(T(0), i, l);
+		}
+	}
+
+	for (int i = 0; i <= height; i++) {
+		for (int j = 0; j <= width; j++) {
+			// fill buffer
+			for (int l = 0; l < layers; l++) {
+				window_buffer.shift_pixels_left();
+				if (j < width) {
+					T new_val;
+					if (i < height) {
+						new_val = in.read();
+					} else {
+						new_val = 0;
+					}
+
+					window_buffer.insert_pixel(line_buffer.getval(0, j*layers+l), 0, 3*layers-1);
+					window_buffer.insert_pixel(line_buffer.getval(1, j*layers+l), 1, 3*layers-1);
+					window_buffer.insert_pixel(new_val, 2, 3*layers-1);
+
+					line_buffer.shift_pixels_up(j*layers+l);
+					line_buffer.insert_bottom_row(new_val, j*layers+l);
+				} else {
+					for (int k =0; k < 3; k++) {
+						window_buffer.insert_pixel(0, k, 3*layers-1);
+					}
+				}
+			}
+
+			// convolution
+			if (i > 0 && j > 0) {
+				T sum = 0;
+				for (int k = 0; k < 3; k++) {
+					for (int l = 0; l < 3*layers; l++) {
+						sum += window_buffer.getval(k, l) * weights.getval(k, l);
+					}
+				}
+				out.write(sum);
+			}
+		}
+	}
+}
