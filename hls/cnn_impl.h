@@ -197,6 +197,9 @@ private:
 
 protected:
 	void push(int l, int b, int j, T v) {
+// push is always used for whole line, so no close dependence
+#pragma HLS DEPENDENCE variable=line_buffer inter false
+#pragma HLS PIPELINE
 		assert(l >= 0);
 		assert(l < MAX_LAYERS);
 		assert(l < layers);
@@ -205,7 +208,6 @@ protected:
 		assert(j >= 0);
 		assert(j < MAX_LINE);
 		assert(j < width);
-#pragma HLS PIPELINE
 
 		int idx = j*layers + l;
 		assert(idx < MAX_LINE);
@@ -216,6 +218,9 @@ protected:
 	}
 
 	T push_and_conv(int l, int b, int j, T v) {
+// inside one pipeline run (for layers) no dependence on line_buffer
+#pragma HLS DEPENDENCE variable=line_buffer inter false
+#pragma HLS PIPELINE
 		assert(l >= 0);
 		assert(l < MAX_LAYERS);
 		assert(l < layers);
@@ -224,17 +229,9 @@ protected:
 		assert(j >= 0);
 		assert(j < MAX_LINE);
 		assert(j < width);
-#pragma HLS PIPELINE
 
 		int idx = j*layers + l;
 		assert(idx < MAX_LINE);
-
-		if (3*j+b < width) {
-			PC_PUSH: for (int k = 1; k < 3; k++) {
-				line_buffer[k-1][b][idx] = line_buffer[k][b][idx];
-			}
-			line_buffer[2][b][idx] = v;
-		}
 
 		T sum(0);
 		PC_I: for (int i = 0; i < 3; i++) {
@@ -248,7 +245,14 @@ protected:
 					tmp[0] = line_buffer[i][1][idx-layers];
 					tmp[1] = line_buffer[i][2][idx-layers];
 				}
-				tmp[2] = line_buffer[i][0][idx];
+				if (i == 2 || 3*j+b >= width) {
+					tmp[2] = v;
+				} else {
+					tmp[2] = line_buffer[i+1][0][idx];
+				}
+				if (3*j+b < width) {
+					line_buffer[i][0][idx] = tmp[2];
+				}
 				break;
 			case 1:
 				if (idx - layers < 0) {
@@ -257,14 +261,29 @@ protected:
 					tmp[0] = line_buffer[i][2][idx-layers];
 				}
 				tmp[1] = line_buffer[i][0][idx];
-				tmp[2] = line_buffer[i][1][idx];
+				if (i == 2 || 3*j+b >= width) {
+					tmp[2] = v;
+				} else {
+					tmp[2] = line_buffer[i+1][1][idx];
+				}
+				if (3*j+b < width) {
+					line_buffer[i][1][idx] = tmp[2];
+				}
 				break;
 			case 2:
 				tmp[0] = line_buffer[i][0][idx];
 				tmp[1] = line_buffer[i][1][idx];
-				tmp[2] = line_buffer[i][2][idx];
+				if (i == 2 || 3*j+b >= width) {
+					tmp[2] = v;
+				} else {
+					tmp[2] = line_buffer[i+1][2][idx];
+				}
+				if (3*j+b < width) {
+					line_buffer[i][2][idx] = tmp[2];
+				}
 				break;
 			}
+
 
 			// partial sum for optimize summing
 			T psum(0);
@@ -319,6 +338,7 @@ public:
 		INIT_2LINES: for (int i = 0; i < 2; i++) {
 			INIT_WIDTH: for (int j = 0; 3*j < width; j++) {
 				INIT_BANK: for (int b = 0; b < 3 && 3*j+b < width; b++) {
+#pragma HLS LOOP_TRIPCOUNT min=3 max=3 avg=3
 					INIT_LAYERS: for (int l = 0; l < layers; l++) {
 #pragma HLS PIPELINE
 						T v(0);
@@ -334,6 +354,7 @@ public:
 		CONV_HEIGHT: for (int i = 0; i < height; i++) {
 			CONV_WIDTH: for (int j = 0; 3*j <= width; j++) {
 				CONV_BANK: for (int b = 0; b < 3 && 3*j+b <= width; b++) {
+#pragma HLS LOOP_TRIPCOUNT min=3 max=3 avg=3
 					T sum(0);
 					CONV_LAYERS: for (int l = 0; l < layers; l++) {
 #pragma HLS PIPELINE
