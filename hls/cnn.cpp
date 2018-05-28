@@ -48,5 +48,10 @@ void cnn_full_layer_stack(hls::stream<decimal_t> &in, hls::stream<decimal_t> &ou
 }
 
 void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights) {
-	general_conv2d<decimal_t, 128, 3328>(in, out, weights, 3, 416, 416);
+	ConvClass<decimal_t, 128, 1110> c_impl;
+	c_impl.set_width(416);
+	c_impl.set_height(416);
+	c_impl.set_layers(3);
+	c_impl.load_weights(weights);
+	c_impl.convolute(in, out);
 }

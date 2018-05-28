@@ -186,72 +186,168 @@ void join(hls::stream<T> &out, hls::stream<T> ins[LAYERS]) {
 }
 
 template <typename T, int MAX_LAYERS, int MAX_LINE>
-void general_conv2d(hls::stream<T> &in, hls::stream<T> &out, hls::stream<T> &win, int layers, int width, int height) {
-	hls::Window<3, 3*MAX_LAYERS, T> weights;
-	for (int i = 0; i < 3; i++) {
-		for (int l = 0; l < 3*MAX_LAYERS; l++) {
-			weights.insert_pixel(T(0), i, l);
+class ConvClass {
+private:
+// dimensions: y, bank, l + x/3*layers (x is cyclic with bank)
+	T line_buffer[3][3][MAX_LINE];
+	T weights[MAX_LAYERS][3][3];
+	int layers;
+	int width;
+	int height;
+
+protected:
+	void push(int l, int b, int j, T v) {
+		assert(l >= 0);
+		assert(l < MAX_LAYERS);
+		assert(l < layers);
+		assert(b >= 0);
+		assert(b < 3);
+		assert(j >= 0);
+		assert(j < MAX_LINE);
+		assert(j < width);
+#pragma HLS PIPELINE
+
+		int idx = j*layers + l;
+		assert(idx < MAX_LINE);
+		PUSH: for (int k = 1; k < 3; k++) {
+			line_buffer[k-1][b][idx] = line_buffer[k][b][idx];
 		}
+		line_buffer[2][b][idx] = v;
 	}
 
-	for (int i = 0; i < 3; i++) {
-		for (int l = 0; l < 3*MAX_LAYERS; l++) {
-			weights.insert_pixel(win.read(), i, l);
+	T push_and_conv(int l, int b, int j, T v) {
+		assert(l >= 0);
+		assert(l < MAX_LAYERS);
+		assert(l < layers);
+		assert(b >= 0);
+		assert(b < 3);
+		assert(j >= 0);
+		assert(j < MAX_LINE);
+		assert(j < width);
+#pragma HLS PIPELINE
+
+		int idx = j*layers + l;
+		assert(idx < MAX_LINE);
+
+		if (3*j+b < width) {
+			PC_PUSH: for (int k = 1; k < 3; k++) {
+				line_buffer[k-1][b][idx] = line_buffer[k][b][idx];
+			}
+			line_buffer[2][b][idx] = v;
 		}
-	}
 
-	// line buffer width = width*layers and is constant for layers 2 to 6
-	hls::LineBuffer<2, MAX_LINE, T> line_buffer;
-	hls::Window<3, 3*MAX_LAYERS, T> window_buffer;
-
-	// init top padding
-	for (int j = 0; j < MAX_LINE; j++) {
-		line_buffer.insert_bottom_row(0, j);
-	}
-
-	// init window to 0 for left padding
-	for (int i = 0; i < 3; i++) {
-		for (int l = 0; l < 3*MAX_LAYERS; l++) {
-			window_buffer.insert_pixel(T(0), i, l);
-		}
-	}
-
-	for (int i = 0; i <= height; i++) {
-		for (int j = 0; j <= width; j++) {
-			// fill buffer
-			for (int l = 0; l < layers; l++) {
-				window_buffer.shift_pixels_left();
-				if (j < width) {
-					T new_val;
-					if (i < height) {
-						new_val = in.read();
-					} else {
-						new_val = 0;
-					}
-
-					window_buffer.insert_pixel(line_buffer.getval(0, j*layers+l), 0, 3*layers-1);
-					window_buffer.insert_pixel(line_buffer.getval(1, j*layers+l), 1, 3*layers-1);
-					window_buffer.insert_pixel(new_val, 2, 3*layers-1);
-
-					line_buffer.shift_pixels_up(j*layers+l);
-					line_buffer.insert_bottom_row(new_val, j*layers+l);
+		T sum(0);
+		PC_I: for (int i = 0; i < 3; i++) {
+			T tmp[3];
+			switch (b) {
+			case 0:
+				if (idx - layers < 0) {
+					tmp[0] = T(0);
+					tmp[1] = T(0);
 				} else {
-					for (int k =0; k < 3; k++) {
-						window_buffer.insert_pixel(0, k, 3*layers-1);
-					}
+					tmp[0] = line_buffer[i][1][idx-layers];
+					tmp[1] = line_buffer[i][2][idx-layers];
 				}
+				tmp[2] = line_buffer[i][0][idx];
+				break;
+			case 1:
+				if (idx - layers < 0) {
+					tmp[0] = T(0);
+				} else {
+					tmp[0] = line_buffer[i][2][idx-layers];
+				}
+				tmp[1] = line_buffer[i][0][idx];
+				tmp[2] = line_buffer[i][1][idx];
+				break;
+			case 2:
+				tmp[0] = line_buffer[i][0][idx];
+				tmp[1] = line_buffer[i][1][idx];
+				tmp[2] = line_buffer[i][2][idx];
+				break;
 			}
 
-			// convolution
-			if (i > 0 && j > 0) {
-				T sum = 0;
-				for (int k = 0; k < 3; k++) {
-					for (int l = 0; l < 3*layers; l++) {
-						sum += window_buffer.getval(k, l) * weights.getval(k, l);
-					}
+			// partial sum for optimize summing
+			T psum(0);
+			PC_K: for (int k = 0; k < 3; k++) {
+				psum += tmp[k]*weights[l][i][k];
+			}
+			sum += psum;
+		}
+		return sum;
+	}
+
+public:
+	ConvClass() {
+		// pragmas have to be in function, so we put them in constructor
+#pragma HLS ARRAY_PARTITION variable=line_buffer complete dim=1
+#pragma HLS ARRAY_PARTITION variable=line_buffer complete dim=2
+#pragma HLS ARRAY_PARTITION variable=weights complete dim=2
+#pragma HLS ARRAY_PARTITION variable=weights complete dim=3
+
+		layers = 0;
+		width = 0;
+		height = 0;
+	}
+
+	void set_layers(int l) {
+		assert(l < MAX_LAYERS);
+
+		layers = l;
+	}
+
+	void set_width(int w) {
+		assert(w < MAX_LINE);
+
+		width = w;
+	}
+
+	void set_height(int h) {
+		height = h;
+	}
+
+	void load_weights(hls::stream<T> &win) {
+		LOAD_WEIGHTS_I: for (int i = 0; i < 3; i++) {
+			LOAD_WEIGHTS_J: for (int j = 0; j < 3; j++) {
+				LOAD_WEIGHTS_L: for (int l = 0; l < layers; l++) {
+					weights[l][i][j] = win.read();
 				}
-				out.write(sum);
 			}
 		}
 	}
-}
+
+	void convolute(hls::stream<T> &in, hls::stream<T> &out) {
+		INIT_2LINES: for (int i = 0; i < 2; i++) {
+			INIT_WIDTH: for (int j = 0; 3*j < width; j++) {
+				INIT_BANK: for (int b = 0; b < 3 && 3*j+b < width; b++) {
+					INIT_LAYERS: for (int l = 0; l < layers; l++) {
+#pragma HLS PIPELINE
+						T v(0);
+						if (i == 1) {
+							v = in.read();
+						}
+						push(l, b, j, v);
+					}
+				}
+			}
+		}
+
+		CONV_HEIGHT: for (int i = 0; i < height; i++) {
+			CONV_WIDTH: for (int j = 0; 3*j <= width; j++) {
+				CONV_BANK: for (int b = 0; b < 3 && 3*j+b <= width; b++) {
+					T sum(0);
+					CONV_LAYERS: for (int l = 0; l < layers; l++) {
+#pragma HLS PIPELINE
+						T v(0);
+						if (3*j + b < width && i < height - 1) {
+							v = in.read();
+						}
+						sum += push_and_conv(l, b, j, v);
+					}
+					if (!(j == 0 && b == 0)) {
+						out.write(sum);
+					}
+				}
+			}
+		}
+	}
+};
