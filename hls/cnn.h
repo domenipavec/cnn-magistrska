@@ -5,11 +5,12 @@
 #include <hls_video.h>
 #include <hls_half.h>
 
-//typedef float decimal_t;
-typedef ap_fixed<24, 7, AP_TRN, AP_SAT> decimal_t;
+typedef float decimal_t;
+//typedef ap_fixed<24, 7, AP_TRN, AP_SAT> decimal_t;
 
 void cnn(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights);
 void cnn_full_layer_stack(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights);
+void conv2d_use_class(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int width, int height, int layers);
 void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int width, int height, int layers);
 
 template <typename T, int LAYERS, int WIDTH, int HEIGHT>
