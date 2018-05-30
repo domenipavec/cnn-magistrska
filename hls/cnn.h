@@ -10,7 +10,7 @@ typedef ap_fixed<24, 7, AP_TRN, AP_SAT> decimal_t;
 
 void cnn(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights);
 void cnn_full_layer_stack(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights);
-void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights);
+void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int width, int height, int layers);
 
 template <typename T, int LAYERS, int WIDTH, int HEIGHT>
 void conv2d(hls::stream<T> &in, hls::stream<T> &out, hls::stream<T> &weights);

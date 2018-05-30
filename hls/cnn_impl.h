@@ -192,6 +192,7 @@ private:
 	T line_buffer[3][3][MAX_LINE];
 	T weights[MAX_LAYERS][3][3];
 	int layers;
+	int lshift;
 	int width;
 	int height;
 
@@ -209,7 +210,7 @@ protected:
 		assert(j < MAX_LINE);
 		assert(j < width);
 
-		int idx = j*layers + l;
+		int idx = (j<<lshift) | l;
 		assert(idx < MAX_LINE);
 		PUSH: for (int k = 1; k < 3; k++) {
 			line_buffer[k-1][b][idx] = line_buffer[k][b][idx];
@@ -230,7 +231,8 @@ protected:
 		assert(j < MAX_LINE);
 		assert(j < width);
 
-		int idx = j*layers + l;
+		int idx = (j << lshift) | l;
+		int previdx = ((j-1) << lshift) | l;
 		assert(idx < MAX_LINE);
 
 		T sum(0);
@@ -238,12 +240,12 @@ protected:
 			T tmp[3];
 			switch (b) {
 			case 0:
-				if (idx - layers < 0) {
+				if (previdx < 0) {
 					tmp[0] = T(0);
 					tmp[1] = T(0);
 				} else {
-					tmp[0] = line_buffer[i][1][idx-layers];
-					tmp[1] = line_buffer[i][2][idx-layers];
+					tmp[0] = line_buffer[i][1][previdx];
+					tmp[1] = line_buffer[i][2][previdx];
 				}
 				if (i == 2 || 3*j+b >= width) {
 					tmp[2] = v;
@@ -255,10 +257,10 @@ protected:
 				}
 				break;
 			case 1:
-				if (idx - layers < 0) {
+				if (previdx < 0) {
 					tmp[0] = T(0);
 				} else {
-					tmp[0] = line_buffer[i][2][idx-layers];
+					tmp[0] = line_buffer[i][2][previdx];
 				}
 				tmp[1] = line_buffer[i][0][idx];
 				if (i == 2 || 3*j+b >= width) {
@@ -306,12 +308,33 @@ public:
 		layers = 0;
 		width = 0;
 		height = 0;
+		lshift = 0;
 	}
 
 	void set_layers(int l) {
-		assert(l < MAX_LAYERS);
+		assert(l <= MAX_LAYERS);
+		assert(l <= 1024);
 
 		layers = l;
+		if (layers <= 4) {
+			lshift = 2;
+		} else if (layers <= 8) {
+			lshift = 3;
+		} else if (layers <= 16) {
+			lshift = 4;
+		} else if (layers <= 32) {
+			lshift = 5;
+		} else if (layers <= 64) {
+			lshift = 6;
+		} else if (layers <= 128) {
+			lshift = 7;
+		} else if (layers <= 256) {
+			lshift = 8;
+		} else if (layers <= 512) {
+			lshift = 9;
+		} else if (layers <= 1024) {
+			lshift = 10;
+		}
 	}
 
 	void set_width(int w) {

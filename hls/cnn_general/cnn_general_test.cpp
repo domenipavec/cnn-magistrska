@@ -18,7 +18,7 @@ int main() {
 		in.write(v);
 	}
 
-	cnn_general(in, out, weights);
+	cnn_general(in, out, weights, 416, 416, 3);
 
 	for (int i = 0; i < 416*416; i++) {
 		std::cout << out.read() << std::endl;
