@@ -29,3 +29,11 @@ void conv2d_use_class(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, h
 	c_impl.load_weights(weights);
 	c_impl.convolute(in, out);
 }
+
+void stream_weights(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int in_layers, int out_layers) {
+	StreamWeights<decimal_t, 11, 1024> c_impl;
+	c_impl.set_in_layers(in_layers);
+	c_impl.set_out_layers(out_layers);
+	c_impl.load_input(in);
+	c_impl.run(weights, out);
+}
