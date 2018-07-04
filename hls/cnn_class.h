@@ -2,7 +2,8 @@ template <typename T, int MAX_IN_LAYERS, int MAX_OUT_LAYERS, int MAX_LINE>
 class ConvClass {
 private:
 // dimensions: y, l + x*layers
-	T line_buffer[3][MAX_LINE];
+	T line_buffer[2][MAX_LINE];
+	T window[3*MAX_IN_LAYERS];
 	T weights[MAX_IN_LAYERS][3][3][MAX_OUT_LAYERS];
 	int in_layers;
 	int out_layers;
@@ -57,6 +58,7 @@ public:
 	}
 
 	void convolute(hls::stream<T> &in, hls::stream<T> &out) {
+
 		INIT_2LINES: for (int i = 0; i < 2; i++) {
 			INIT_WIDTH: for (int j = 0; j < size; j++) {
 				INIT_LAYERS: for (int l = 0; l < in_layers; l++) {
@@ -75,12 +77,16 @@ public:
 
 					int idx = (j<<lshift) | l;
 					assert(idx < MAX_LINE);
-					PUSH: for (int k = 1; k < 3; k++) {
+					PUSH: for (int k = 1; k < 2; k++) {
 						line_buffer[k-1][idx] = line_buffer[k][idx];
 					}
-					line_buffer[2][idx] = v;
+					line_buffer[1][idx] = v;
 				}
 			}
+		}
+
+		for (int l = 0; l < in_layers; l++) {
+			window[3*l+2] = 0;
 		}
 
 		CONV_HEIGHT: for (int i = 0; i < size; i++) {
@@ -108,8 +114,25 @@ public:
 					int ppidx = ((j-2) << lshift) | l;
 					assert(idx < MAX_LINE);
 
-					T suml(0);
-					PC_I: for (int m = 0; m < 3; m++) {
+					// shift window
+					T next_window(0);
+					if (j < size) {
+						next_window = line_buffer[0][idx];
+					}
+					for (int k = 0; k < 2; k++) {
+						window[3*l+k] = window[3*l+k+1];
+					}
+					window[3*l+2] = next_window;
+
+					// sum window (first) row
+					for (int k = 0; k < 3; k++) {
+						for (int o = 0; o < out_layers; o++) {
+							sum[o] += window[3*l+k]*weights[l][0][k][o];
+						}
+					}
+
+					// sum other two rows
+					PC_I: for (int m = 0; m < 2; m++) {
 						T tmp[3];
 						if (ppidx < 0) {
 							tmp[0] = T(0);
@@ -121,7 +144,7 @@ public:
 						} else {
 							tmp[1] = line_buffer[m][pidx];
 						}
-						if (m == 2) {
+						if (m == 1) {
 							tmp[2] = v;
 						} else {
 							tmp[2] = line_buffer[m+1][idx];
@@ -135,7 +158,7 @@ public:
 
 						PC_K: for (int k = 0; k < 3; k++) {
 							for (int o = 0; o < out_layers; o++) {
-								sum[o] += tmp[k]*weights[l][m][k][o];
+								sum[o] += tmp[k]*weights[l][m+1][k][o];
 							}
 						}
 //							suml += psum;
