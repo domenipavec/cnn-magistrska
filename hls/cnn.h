@@ -8,6 +8,8 @@
 //typedef float decimal_t;
 typedef ap_fixed<24, 7, AP_TRN, AP_SAT> decimal_t;
 
+int shift_from_layers(int layers);
+
 void cnn(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights);
 void cnn_full_layer_stack(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights);
 void conv2d_use_class(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int size, int in_layers, int out_layers);

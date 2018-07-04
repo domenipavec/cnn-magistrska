@@ -1,26 +1,3 @@
-int shift_from_layers(int layers) {
-	if (layers <= 4) {
-		return 2;
-	} else if (layers <= 8) {
-		return 3;
-	} else if (layers <= 16) {
-		return 4;
-	} else if (layers <= 32) {
-		return 5;
-	} else if (layers <= 64) {
-		return 6;
-	} else if (layers <= 128) {
-		return 7;
-	} else if (layers <= 256) {
-		return 8;
-	} else if (layers <= 512) {
-		return 9;
-	} else if (layers <= 1024) {
-		return 10;
-	}
-	return 11;
-}
-
 template <typename T, int MAX_SIZE>
 void max_pool(hls::stream<T> &in, hls::stream<T> &out, int size, int out_layers) {
 	assert(size <= 416);

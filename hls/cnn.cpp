@@ -80,3 +80,26 @@ void conv2d_stream_weights(hls::stream<decimal_t> &in, hls::stream<decimal_t> &o
 	c_impl.load_input(in);
 	c_impl.run(weights, out);
 }
+
+int shift_from_layers(int layers) {
+	if (layers <= 4) {
+		return 2;
+	} else if (layers <= 8) {
+		return 3;
+	} else if (layers <= 16) {
+		return 4;
+	} else if (layers <= 32) {
+		return 5;
+	} else if (layers <= 64) {
+		return 6;
+	} else if (layers <= 128) {
+		return 7;
+	} else if (layers <= 256) {
+		return 8;
+	} else if (layers <= 512) {
+		return 9;
+	} else if (layers <= 1024) {
+		return 10;
+	}
+	return 11;
+}
