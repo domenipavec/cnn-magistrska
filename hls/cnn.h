@@ -5,8 +5,8 @@
 #include <hls_video.h>
 #include <hls_half.h>
 
-//typedef float decimal_t;
-typedef ap_fixed<24, 7, AP_TRN, AP_SAT> decimal_t;
+typedef float decimal_t;
+//typedef ap_fixed<24, 7, AP_TRN, AP_SAT> decimal_t;
 
 int shift_from_layers(int layers);
 

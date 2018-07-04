@@ -65,7 +65,7 @@ void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int si
 }
 
 void conv2d_use_class(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int size, int in_layers, int out_layers) {
-	ConvClass<decimal_t, 128, 64, 1110> c_impl;
+	ConvClass<decimal_t, 128, 64, 3328> c_impl;
 	c_impl.set_size(size);
 	c_impl.set_in_layers(in_layers);
 	c_impl.set_out_layers(out_layers);
