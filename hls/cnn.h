@@ -15,5 +15,7 @@ void conv2d_stream_weights(hls::stream<decimal_t> &in, hls::stream<decimal_t> &o
 void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int size, int in_layers, int out_layers, bool stream_weights, int max_type);
 
 #include "cnn_impl.h"
+#include "cnn_class.h"
+#include "cnn_streamw.h"
 
 #endif
