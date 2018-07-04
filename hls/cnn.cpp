@@ -1,36 +1,67 @@
 #include "cnn.h"
 
-void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int width, int height, int layers) {
+void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int size, int in_layers, int out_layers, bool stream_weights, int max_type) {
 #pragma HLS DATAFLOW
-	assert(width <= 416);
-	assert(height <= 416);
-	assert(layers <= 3);
-	hls::stream<decimal_t> conv_out("full_layer_conv_out");
-	hls::stream<decimal_t> batch_out("full_layer_batch_out");
-	hls::stream<decimal_t> leaky_out("full_layer_leaky_out");
+	assert(size <= 13);
+//	assert(in_layers <= 1024);
+//	assert(out_layers <= 1024);
+//	assert(stream_weights == 1);
+//	assert(max_type == 0);
 
-	hls::stream<decimal_t> weights_only("full_layer_weights_only");
-	decimal_t scale;
-	decimal_t add;
-	extract_scale_add<decimal_t>(weights, weights_only, scale, add, 3*3*layers);
+	hls::stream<decimal_t> conv_out("conv_out");
+#pragma HLS STREAM variable=conv_out depth=1 dim=1
+	hls::stream<decimal_t> batch_out("batch_out");
+#pragma HLS STREAM variable=batch_out depth=1 dim=1
+	hls::stream<decimal_t> leaky_out("leaky_out");
+#pragma HLS STREAM variable=leaky_out depth=1 dim=1
 
-	conv2d_use_class(in, conv_out, weights_only, width, height, layers);
+	hls::stream<decimal_t> weights_data("weights_data");
+#pragma HLS STREAM variable=weights_data depth=1 dim=1
+	hls::stream<decimal_t> scale_add("scale_add");
+#pragma HLS STREAM variable=scale_add depth=1 dim=1
+	hls::stream<decimal_t> weights("weights");
+#pragma HLS STREAM variable=weights depth=1 dim=1
+	hls::stream<decimal_t> data("data");
+#pragma HLS STREAM variable=data depth=1 dim=1
 
-	batch_norm<decimal_t>(conv_out, batch_out, scale, add, width, height);
-	leaky_relu<decimal_t>(batch_out, leaky_out, width, height);
-	max_pool<decimal_t, 416>(leaky_out, out, width, height);
+	int size2 = size*size;
+	int out_size = size2*out_layers;
+	int in_size = size2*in_layers;
+	int weights_size = 3*3*in_layers*out_layers;
+
+	split<decimal_t>(in, scale_add, weights_data, 2*out_layers, weights_size + in_size);
+
+	if (stream_weights) {
+		split<decimal_t>(weights_data, data, weights, in_size, weights_size);
+		conv2d_stream_weights(data, conv_out, weights, in_layers, out_layers);
+		batch_norm_per_layer<decimal_t, 1024>(conv_out, batch_out, scale_add, size, out_layers);
+	} else {
+		split<decimal_t>(weights_data, weights, data, weights_size, in_size);
+		conv2d_use_class(data, conv_out, weights, size, in_layers, out_layers);
+		batch_norm<decimal_t, 1024>(conv_out, batch_out, scale_add, size, out_layers);
+	}
+
+	leaky_relu<decimal_t>(batch_out, leaky_out, out_size);
+
+	if (max_type == 0) {
+		direct<decimal_t>(leaky_out, out, out_size);
+	} else if (max_type == 1) {
+		max_pool_1<decimal_t, 416>(leaky_out, out, size, out_layers);
+	} else {
+		max_pool<decimal_t, 416, 256>(leaky_out, out, size, out_layers);
+	}
 }
 
-void conv2d_use_class(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int width, int height, int layers) {
-	ConvClass<decimal_t, 128, 1110> c_impl;
-	c_impl.set_width(width);
-	c_impl.set_height(height);
-	c_impl.set_layers(layers);
+void conv2d_use_class(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int size, int in_layers, int out_layers) {
+	ConvClass<decimal_t, 128, 256, 1110> c_impl;
+	c_impl.set_size(size);
+	c_impl.set_in_layers(in_layers);
+	c_impl.set_out_layers(out_layers);
 	c_impl.load_weights(weights);
 	c_impl.convolute(in, out);
 }
 
-void stream_weights(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int in_layers, int out_layers) {
+void conv2d_stream_weights(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int in_layers, int out_layers) {
 	StreamWeights<decimal_t, 11, 1024> c_impl;
 	c_impl.set_in_layers(in_layers);
 	c_impl.set_out_layers(out_layers);

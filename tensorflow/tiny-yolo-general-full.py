@@ -61,6 +61,7 @@ with tfnet.graph.as_default():
         img = tfnet.framework.resize_input(orig_img)
         img = np.expand_dims(img, 0)
         h, w, _ = orig_img.shape
+        print(img.shape)
 
         weights = sess.run(layers[0].w['kernel'])
         out = sess.run(output, {inpt: img})[0]
@@ -73,34 +74,40 @@ with tfnet.graph.as_default():
         max_diff = 0
         total_diff = 0
         total_count = 0
-        for i in range(weights.shape[-1]):
-            input_buffer = io.StringIO()
-            scale = gamma[i]/np.sqrt(variance[i]+1e-5)
-            add = bias[i] - mean[i]*scale
-            np.savetxt(input_buffer, [scale, add])
+
+        out_layers = weights.shape[-1]
+
+        scale = [gamma[i]/np.sqrt(variance[i]+1e-5) for i in range(weights.shape[-1])]
+        add = [bias[i] - mean[i]*scale[i] for i in range(weights.shape[-1])]
+
+        input_buffer = io.StringIO()
+        np.savetxt(input_buffer, [416, weights.shape[-2], out_layers, 0, 2], fmt='%d')
+        np.savetxt(input_buffer, [(scale[i], add[i]) for i in range(out_layers)])
+        for i in range(out_layers):
             np.savetxt(input_buffer, weights[:, :, :, i].flatten())
-            np.savetxt(input_buffer, img.flatten())
+        np.savetxt(input_buffer, img.flatten())
 
-            print("Running layer", i)
-            cmd = subprocess.run(
-                "../hls/cnn_general/solution1/csim/build/csim.exe",
-                input=input_buffer.getvalue(),
-                stdout=subprocess.PIPE,
-                encoding='utf-8',
-            )
-            output = io.StringIO(cmd.stdout)
+        print("running")
+        cmd = subprocess.run(
+            "../hls/cnn_general/solution1/csim/build/csim.exe",
+            input=input_buffer.getvalue(),
+            stdout=subprocess.PIPE,
+            encoding='utf-8',
+        )
+        output = io.StringIO(cmd.stdout)
 
-            it = np.nditer(out[:, :, i], flags=['multi_index'])
-            while not it.finished:
-                expected = it[0]
-                result = float(next(output))
-                diff = abs(result-expected)
-                if diff > 1e-3:
-                    print(it.multi_index, result)
-                max_diff = max(diff, max_diff)
-                total_diff += diff
-                total_count += 1
-                it.iternext()
+
+        it = np.nditer(out[:, :, :out_layers], flags=['multi_index'])
+        while not it.finished:
+            expected = it[0]
+            result = float(next(output))
+            diff = abs(result-expected)
+            if diff > 1e-3:
+                print(it.multi_index, result, diff)
+            max_diff = max(diff, max_diff)
+            total_diff += diff
+            total_count += 1
+            it.iternext()
 
             #  break
 
