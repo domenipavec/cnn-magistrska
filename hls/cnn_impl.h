@@ -1,31 +1,60 @@
-template <typename T, int MAX_SIZE, int MAX_OUT_LAYERS>
+int shift_from_layers(int layers) {
+	if (layers <= 4) {
+		return 2;
+	} else if (layers <= 8) {
+		return 3;
+	} else if (layers <= 16) {
+		return 4;
+	} else if (layers <= 32) {
+		return 5;
+	} else if (layers <= 64) {
+		return 6;
+	} else if (layers <= 128) {
+		return 7;
+	} else if (layers <= 256) {
+		return 8;
+	} else if (layers <= 512) {
+		return 9;
+	} else if (layers <= 1024) {
+		return 10;
+	}
+	return 11;
+}
+
+template <typename T, int MAX_SIZE>
 void max_pool(hls::stream<T> &in, hls::stream<T> &out, int size, int out_layers) {
-	T buffer[MAX_SIZE/2][MAX_OUT_LAYERS];
+	assert(size <= 416);
+	assert(out_layers <= 256);
+
+	T buffer[MAX_SIZE];
 	T tmp;
+
+	int shift = shift_from_layers(out_layers);
 
 	for (int i = 0; i < size; i++) {
 		for (int j = 0; j < size; j++) {
 			for (int l = 0; l < out_layers; l++) {
 #pragma HLS PIPELINE
+				int idx = ((j>>1) << shift) | l;
 				tmp = in.read();
 				if ((i & 1) == 0) {
 					if ((j & 1) == 0) {
-						buffer[j/2][l] = tmp;
+						buffer[idx] = tmp;
 					} else {
-						if (tmp > buffer[j/2][l]) {
-							buffer[j/2][l] = tmp;
+						if (tmp > buffer[idx]) {
+							buffer[idx] = tmp;
 						}
 					}
 				} else {
 					if ((j & 1) == 0) {
-						if (tmp > buffer[j/2][l]) {
-							buffer[j/2][l] = tmp;
+						if (tmp > buffer[idx]) {
+							buffer[idx] = tmp;
 						}
 					} else {
-						if (tmp > buffer[j/2][l]) {
-							buffer[j/2][l] = tmp;
+						if (tmp > buffer[idx]) {
+							buffer[idx] = tmp;
 						}
-						out.write(buffer[j/2][l]);
+						out.write(buffer[idx]);
 					}
 				}
 			}
@@ -35,6 +64,9 @@ void max_pool(hls::stream<T> &in, hls::stream<T> &out, int size, int out_layers)
 
 template <typename T, int MAX_SIZE>
 void max_pool_1(hls::stream<T> &in, hls::stream<T> &out, int size, int out_layers) {
+	assert(size <= 416);
+	assert(out_layers <= 1024);
+
 	T buffer[MAX_SIZE];
 
 	T v1;

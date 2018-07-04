@@ -30,25 +30,7 @@ public:
 		assert(l <= 1024);
 
 		in_layers = l;
-		if (in_layers <= 4) {
-			lshift = 2;
-		} else if (in_layers <= 8) {
-			lshift = 3;
-		} else if (in_layers <= 16) {
-			lshift = 4;
-		} else if (in_layers <= 32) {
-			lshift = 5;
-		} else if (in_layers <= 64) {
-			lshift = 6;
-		} else if (in_layers <= 128) {
-			lshift = 7;
-		} else if (in_layers <= 256) {
-			lshift = 8;
-		} else if (in_layers <= 512) {
-			lshift = 9;
-		} else if (in_layers <= 1024) {
-			lshift = 10;
-		}
+		lshift = shift_from_layers(l);
 	}
 
 	void set_out_layers(int l) {

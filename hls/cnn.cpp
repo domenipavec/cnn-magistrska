@@ -2,7 +2,18 @@
 
 void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int size, int in_layers, int out_layers, bool stream_weights, int max_type) {
 #pragma HLS DATAFLOW
-	assert(size <= 13);
+	// general asserts
+	assert(size > 0);
+	assert(size <= 416);
+	assert(in_layers > 0);
+	assert(in_layers <= 1024);
+	assert(out_layers > 0);
+	assert(out_layers <= 1024);
+	assert(max_type >= 0);
+	assert(max_type <= 2);
+
+	// test asserts
+//	assert(size <= 13);
 //	assert(in_layers <= 1024);
 //	assert(out_layers <= 1024);
 //	assert(stream_weights == 1);
@@ -46,14 +57,15 @@ void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int si
 	if (max_type == 0) {
 		direct<decimal_t>(leaky_out, out, out_size);
 	} else if (max_type == 1) {
+		// TODO: change this max size
 		max_pool_1<decimal_t, 416>(leaky_out, out, size, out_layers);
 	} else {
-		max_pool<decimal_t, 416, 256>(leaky_out, out, size, out_layers);
+		max_pool<decimal_t, 3328>(leaky_out, out, size, out_layers);
 	}
 }
 
 void conv2d_use_class(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int size, int in_layers, int out_layers) {
-	ConvClass<decimal_t, 128, 256, 1110> c_impl;
+	ConvClass<decimal_t, 128, 64, 1110> c_impl;
 	c_impl.set_size(size);
 	c_impl.set_in_layers(in_layers);
 	c_impl.set_out_layers(out_layers);
