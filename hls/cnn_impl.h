@@ -52,14 +52,12 @@ void max_pool_1(hls::stream<T> &in, hls::stream<T> &out, int size, int out_layer
 	T max;
 
 	for (int l = 0; l < out_layers; l++) {
-		for (int i = 0; i <= size; i++) {
+		for (int i = 0; i < size; i++) {
 			v1 = 0;
 			for (int j = 0; j <= size; j++) {
 #pragma HLS PIPELINE
-				if (j < size) {
+				if (j < size) { // on last element simply keep v2
 					v2 = in.read();
-				} else {
-					v2 = 0;
 				}
 
 				if (j > 0) {
@@ -81,6 +79,9 @@ void max_pool_1(hls::stream<T> &in, hls::stream<T> &out, int size, int out_layer
 
 				v1 = v2;
 			}
+		}
+		for (int j = 0; j < size; j++) {
+			out.write(buffer[j]);
 		}
 	}
 }
@@ -146,7 +147,7 @@ void leaky_relu(hls::stream<T> &in, hls::stream<T> &out, int size) {
 	}
 }
 
-template <typename T>
+template <typename T, int ID>
 void direct(hls::stream<T> &in, hls::stream<T> &out, int size) {
 	for (int i = 0; i < size; i++) {
 #pragma HLS PIPELINE
@@ -154,7 +155,7 @@ void direct(hls::stream<T> &in, hls::stream<T> &out, int size) {
 	}
 }
 
-template <typename T>
+template <typename T, int ID>
 void split(hls::stream<T> &in, hls::stream<T> &out1, hls::stream<T> &out2, int size1, int size2) {
 	for (int i = 0; i < size1; i++) {
 		out1.write(in.read());

@@ -3,19 +3,14 @@
 ## Please DO NOT edit it.
 ## Copyright (C) 1986-2017 Xilinx, Inc. All Rights Reserved.
 ############################################################
-open_project cnn_general
-set_top cnn_general
-add_files cnn_streamw.h
-add_files cnn_impl.h
-add_files cnn_class.h
-add_files cnn.h
-add_files cnn.cpp
-add_files -tb cnn_general/cnn_general_test.cpp
+open_project dma_test
+set_top dma_test
+add_files dma_test/dma_test.cpp
 open_solution "solution1"
 set_part {xc7z020clg484-1} -tool vivado
 create_clock -period 10 -name default
-#source "./cnn_general/solution1/directives.tcl"
-csim_design -clean -compiler gcc
+#source "./dma_test/solution1/directives.tcl"
+#csim_design
 csynth_design
-cosim_design -compiler gcc
+#cosim_design
 export_design -rtl verilog -format ip_catalog

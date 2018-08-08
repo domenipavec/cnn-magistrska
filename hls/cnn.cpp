@@ -1,7 +1,78 @@
 #include "cnn.h"
 
-void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int size, int in_layers, int out_layers, bool stream_weights, int max_type) {
+void sink(hls::stream<decimal_t> &in, int size) {
+	for (int i = 0; i < size; i++) {
+		in.read();
+	}
+}
+
+void source(hls::stream<decimal_t> &out, int size) {
+	for (int i = 0; i < size; i++) {
+		if (size < (1 << (DECIMAL_ABOVE - 1))) {
+			out.write(decimal_t(i));
+		} else {
+			out.write(decimal_t(1.1));
+		}
+	}
+}
+
+void measure(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int size, int &real) {
+	for (int i = 0; i < size; i++) {
+		real = i;
+		out.write(in.read());
+	}
+}
+
+void split_data_weights(hls::stream<decimal_t> &in, hls::stream<decimal_t> &weights, hls::stream<decimal_t> &data, int weights_size, int data_size, bool stream_weights) {
+	if (stream_weights) {
+		split<decimal_t, 1>(in, data, weights, data_size, weights_size);
+	} else {
+		split<decimal_t, 2>(in, weights, data, weights_size, data_size);
+	}
+}
+
+void max_pool_full(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, ap_uint<8> control, int size, int out_layers, int out_size) {
+	if (control.get_bit(CTRL_MAXPOOL)) {
+		if (control.get_bit(CTRL_MAXPOOL1)) {
+			max_pool_1<decimal_t, 416>(in, out, size, out_layers);
+		} else {
+			max_pool<decimal_t, 3328>(in, out, size, out_layers);
+		}
+	} else {
+		direct<decimal_t, 0>(in, out, out_size);
+	}
+}
+
+void leaky_relu_full(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int size, bool leaky) {
+	if (leaky) {
+		leaky_relu<decimal_t>(in, out, size);
+	} else {
+		direct<decimal_t, 1>(in, out, size);
+	}
+}
+
+void batch_norm_full(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &scale_add, int size, int out_layers, bool stream_weights) {
+	if (stream_weights) {
+		batch_norm_per_layer<decimal_t, 1024>(in, out, scale_add, size, out_layers);
+	} else {
+		batch_norm<decimal_t, 1024>(in, out, scale_add, size, out_layers);
+	}
+}
+
+void cnn_general(hls::stream<stream_t> &in, hls::stream<stream_t> &out, int size, int in_layers, int out_layers, ap_uint<8> control, int &progress, int prsize) {
+#pragma HLS INTERFACE axis register both port=out
+#pragma HLS INTERFACE axis register both port=in
+
+#pragma HLS INTERFACE s_axilite port=return bundle=CTRL_BUS
+#pragma HLS INTERFACE s_axilite port=size bundle=CTRL_BUS
+#pragma HLS INTERFACE s_axilite port=in_layers bundle=CTRL_BUS
+#pragma HLS INTERFACE s_axilite port=out_layers bundle=CTRL_BUS
+#pragma HLS INTERFACE s_axilite port=control bundle=CTRL_BUS
+#pragma HLS INTERFACE s_axilite port=progress bundle=CTRL_BUS
+#pragma HLS INTERFACE s_axilite port=prsize bundle=CTRL_BUS
+
 #pragma HLS DATAFLOW
+
 	// general asserts
 	assert(size > 0);
 	assert(size <= 416);
@@ -9,8 +80,6 @@ void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int si
 	assert(in_layers <= 1024);
 	assert(out_layers > 0);
 	assert(out_layers <= 1024);
-	assert(max_type >= 0);
-	assert(max_type <= 2);
 
 	// test asserts
 //	assert(size <= 13);
@@ -18,6 +87,13 @@ void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int si
 //	assert(out_layers <= 1024);
 //	assert(stream_weights == 1);
 //	assert(max_type == 0);
+
+	hls::stream<decimal_t> non_axi_in("non_axi_in");
+#pragma HLS STREAM variable=non_axi_in depth=1 dim=1
+	hls::stream<decimal_t> non_axi_in1("non_axi_in1");
+#pragma HLS STREAM variable=non_axi_in1 depth=1 dim=1
+	hls::stream<decimal_t> non_axi_out("non_axi_out");
+#pragma HLS STREAM variable=non_axi_out depth=1 dim=1
 
 	hls::stream<decimal_t> conv_out("conv_out");
 #pragma HLS STREAM variable=conv_out depth=1 dim=1
@@ -39,46 +115,44 @@ void cnn_general(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int si
 	int out_size = size2*out_layers;
 	int in_size = size2*in_layers;
 	int weights_size = 3*3*in_layers*out_layers;
+	int scale_add_size = 2*out_layers;
 
-	split<decimal_t>(in, scale_add, weights_data, 2*out_layers, weights_size + in_size);
+	parse_input(in, non_axi_in, weights_size+scale_add_size, in_size, control.get_bit(CTRL_8BITIN));
 
-	if (stream_weights) {
-		split<decimal_t>(weights_data, data, weights, in_size, weights_size);
-		conv2d_stream_weights(data, conv_out, weights, in_layers, out_layers);
-		batch_norm_per_layer<decimal_t, 1024>(conv_out, batch_out, scale_add, size, out_layers);
-	} else {
-		split<decimal_t>(weights_data, weights, data, weights_size, in_size);
-		conv2d_use_class(data, conv_out, weights, size, in_layers, out_layers);
-		batch_norm<decimal_t, 1024>(conv_out, batch_out, scale_add, size, out_layers);
+	measure(non_axi_in, non_axi_in1, weights_size+scale_add_size+in_size, progress);
+
+	split_data_weights(non_axi_in1, weights_data, data, weights_size+scale_add_size, in_size, control.get_bit(CTRL_STREAM_WEIGHTS));
+
+	split<decimal_t, 0>(weights_data, scale_add, weights, scale_add_size, weights_size);
+
+	conv2d(data, conv_out, weights, size, in_layers, out_layers, control.get_bit(CTRL_STREAM_WEIGHTS));
+
+	batch_norm_full(conv_out, batch_out, scale_add, size, out_layers, control.get_bit(CTRL_STREAM_WEIGHTS));
+
+	leaky_relu_full(batch_out, leaky_out, out_size, control.get_bit(CTRL_LEAKY));
+
+	max_pool_full(leaky_out, non_axi_out, control, size, out_layers, out_size);
+
+	int final_size = out_size;
+	if (control.get_bit(CTRL_MAXPOOL) && !control.get_bit(CTRL_MAXPOOL1)) {
+		final_size /= 4;
 	}
 
-	leaky_relu<decimal_t>(batch_out, leaky_out, out_size);
-
-	if (max_type == 0) {
-		direct<decimal_t>(leaky_out, out, out_size);
-	} else if (max_type == 1) {
-		// TODO: change this max size
-		max_pool_1<decimal_t, 416>(leaky_out, out, size, out_layers);
-	} else {
-		max_pool<decimal_t, 3328>(leaky_out, out, size, out_layers);
-	}
+	format_output(non_axi_out, out, final_size);
 }
 
-void conv2d_use_class(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int size, int in_layers, int out_layers) {
+void conv2d(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int size, int in_layers, int out_layers, bool stream_weights) {
 	ConvClass<decimal_t, 128, 64, 3328> c_impl;
 	c_impl.set_size(size);
 	c_impl.set_in_layers(in_layers);
 	c_impl.set_out_layers(out_layers);
-	c_impl.load_weights(weights);
-	c_impl.convolute(in, out);
-}
-
-void conv2d_stream_weights(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int in_layers, int out_layers) {
-	StreamWeights<decimal_t, 11, 1024> c_impl;
-	c_impl.set_in_layers(in_layers);
-	c_impl.set_out_layers(out_layers);
-	c_impl.load_input(in);
-	c_impl.run(weights, out);
+	if (stream_weights) {
+		c_impl.load_input(in);
+		c_impl.run_weights(weights, out);
+	} else {
+		c_impl.load_weights(weights);
+		c_impl.convolute(in, out);
+	}
 }
 
 int shift_from_layers(int layers) {
@@ -102,4 +176,55 @@ int shift_from_layers(int layers) {
 		return 10;
 	}
 	return 11;
+}
+
+void parse_input(hls::stream<stream_t> &in, hls::stream<decimal_t> &out, int size1, int size2, bool in8bit) {
+	stream_t tmp;
+	decimal_t value;
+
+	for (int i = 0; i < size1; i++) {
+		tmp = in.read();
+		value.range() = tmp.data;
+		out.write(value);
+	}
+	if (in8bit) {
+		for (int i = 0; i < size2/3; i++) {
+			tmp = in.read();
+
+			value.range() = (tmp.data & 0xff)<< (DECIMAL_BITS - DECIMAL_ABOVE - 8);
+			out.write(value);
+			value.range() = ((tmp.data >> 8) & 0xff)<< (DECIMAL_BITS - DECIMAL_ABOVE - 8);
+			out.write(value);
+			value.range() = ((tmp.data >> 16) & 0xff)<< (DECIMAL_BITS - DECIMAL_ABOVE - 8);
+			out.write(value);
+		}
+	} else {
+		for (int i = 0; i < size2; i++) {
+			tmp = in.read();
+			value.range() = tmp.data;
+			out.write(value);
+		}
+	}
+}
+
+void format_output(hls::stream<decimal_t> &in, hls::stream<stream_t> &out, int size) {
+	stream_t valOut;
+
+	valOut.keep = 0b111;
+	valOut.strb = 0b111;
+
+	valOut.dest = 0;
+	valOut.id = 0;
+	valOut.user = 0;
+
+	valOut.last = 0;
+
+	for (int i = 0; i < size; i++) {
+		if (i == size-1) {
+			valOut.last = 1;
+		}
+
+		valOut.data = in.read().range();
+		out.write(valOut);
+	}
 }
