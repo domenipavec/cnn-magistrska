@@ -2,12 +2,14 @@
 
 void sink(hls::stream<decimal_t> &in, int size) {
 	for (int i = 0; i < size; i++) {
+#pragma HLS PIPELINE
 		in.read();
 	}
 }
 
 void source(hls::stream<decimal_t> &out, int size) {
 	for (int i = 0; i < size; i++) {
+#pragma HLS PIPELINE
 		if (size < (1 << (DECIMAL_ABOVE - 1))) {
 			out.write(decimal_t(i));
 		} else {
@@ -18,6 +20,7 @@ void source(hls::stream<decimal_t> &out, int size) {
 
 void measure(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, int size, int &real) {
 	for (int i = 0; i < size; i++) {
+#pragma HLS PIPELINE
 		real = i;
 		out.write(in.read());
 	}
@@ -59,7 +62,7 @@ void batch_norm_full(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hl
 	}
 }
 
-void cnn_general(hls::stream<stream_t> &in, hls::stream<stream_t> &out, int size, int in_layers, int out_layers, ap_uint<8> control, int &progress, int prsize) {
+void cnn_general(hls::stream<stream_t> &in, hls::stream<stream_t> &out, int size, int in_layers, int out_layers, int in_size, int out_size, int weights_size, int scale_add_size, ap_uint<8> control, int &progress, int prsize) {
 #pragma HLS INTERFACE axis register both port=out
 #pragma HLS INTERFACE axis register both port=in
 
@@ -67,6 +70,10 @@ void cnn_general(hls::stream<stream_t> &in, hls::stream<stream_t> &out, int size
 #pragma HLS INTERFACE s_axilite port=size bundle=CTRL_BUS
 #pragma HLS INTERFACE s_axilite port=in_layers bundle=CTRL_BUS
 #pragma HLS INTERFACE s_axilite port=out_layers bundle=CTRL_BUS
+#pragma HLS INTERFACE s_axilite port=in_size bundle=CTRL_BUS
+#pragma HLS INTERFACE s_axilite port=out_size bundle=CTRL_BUS
+#pragma HLS INTERFACE s_axilite port=weights_size bundle=CTRL_BUS
+#pragma HLS INTERFACE s_axilite port=scale_add_size bundle=CTRL_BUS
 #pragma HLS INTERFACE s_axilite port=control bundle=CTRL_BUS
 #pragma HLS INTERFACE s_axilite port=progress bundle=CTRL_BUS
 #pragma HLS INTERFACE s_axilite port=prsize bundle=CTRL_BUS
@@ -76,6 +83,14 @@ void cnn_general(hls::stream<stream_t> &in, hls::stream<stream_t> &out, int size
 	// general asserts
 	assert(size > 0);
 	assert(size <= 416);
+	assert(in_size > 0);
+	assert(in_size <= 416*416*1024);
+	assert(out_size > 0);
+	assert(out_size <= 416*416*1024);
+	assert(weights_size > 0);
+	assert(weights_size <= 3*3*1024*1024);
+	assert(scale_add_size > 0);
+	assert(scale_add_size <= 2*1024);
 	assert(in_layers > 0);
 	assert(in_layers <= 1024);
 	assert(out_layers > 0);
@@ -110,12 +125,6 @@ void cnn_general(hls::stream<stream_t> &in, hls::stream<stream_t> &out, int size
 #pragma HLS STREAM variable=weights depth=1 dim=1
 	hls::stream<decimal_t> data("data");
 #pragma HLS STREAM variable=data depth=1 dim=1
-
-	int size2 = size*size;
-	int out_size = size2*out_layers;
-	int in_size = size2*in_layers;
-	int weights_size = 3*3*in_layers*out_layers;
-	int scale_add_size = 2*out_layers;
 
 	parse_input(in, non_axi_in, weights_size+scale_add_size, in_size, control.get_bit(CTRL_8BITIN));
 
@@ -183,12 +192,14 @@ void parse_input(hls::stream<stream_t> &in, hls::stream<decimal_t> &out, int siz
 	decimal_t value;
 
 	for (int i = 0; i < size1; i++) {
+#pragma HLS PIPELINE
 		tmp = in.read();
 		value.range() = tmp.data;
 		out.write(value);
 	}
 	if (in8bit) {
 		for (int i = 0; i < size2/3; i++) {
+#pragma HLS PIPELINE
 			tmp = in.read();
 
 			value.range() = (tmp.data & 0xff)<< (DECIMAL_BITS - DECIMAL_ABOVE - 8);
@@ -200,6 +211,7 @@ void parse_input(hls::stream<stream_t> &in, hls::stream<decimal_t> &out, int siz
 		}
 	} else {
 		for (int i = 0; i < size2; i++) {
+#pragma HLS PIPELINE
 			tmp = in.read();
 			value.range() = tmp.data;
 			out.write(value);
@@ -220,6 +232,7 @@ void format_output(hls::stream<decimal_t> &in, hls::stream<stream_t> &out, int s
 	valOut.last = 0;
 
 	for (int i = 0; i < size; i++) {
+#pragma HLS PIPELINE
 		if (i == size-1) {
 			valOut.last = 1;
 		}

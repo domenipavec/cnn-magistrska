@@ -16,7 +16,7 @@ private:
 protected:
 	void run_1output(hls::stream<T> &win, hls::stream<T> &out) {
 		INIT_I: for (int i = 0; i < SIZE; i++) {
-//#pragma HLS UNROLL
+#pragma HLS UNROLL
 			INIT_J: for (int j = 0; j < SIZE; j++) {
 #pragma HLS UNROLL
 				output_buffer[i][j] = 0;
@@ -32,7 +32,7 @@ protected:
 
 					APPLY_WEIGHT_J: for (int j = 0; j < SIZE; j++) {
 						APPLY_WEIGHT_K: for (int k = 0; k < SIZE; k++) {
-//#pragma HLS PIPELINE
+#pragma HLS PIPELINE
 							T value;
 							if (j+l >= 0 && j+l < SIZE && k+m >= 0 && k+m < SIZE) {
 								value = buffer[(((j+l)&1)<<10)|i][((j+l)>>1)*11 + k+m];
@@ -49,6 +49,7 @@ protected:
 
 		OUT_I: for (int i = 0; i < SIZE; i++) {
 			OUT_J: for (int j= 0 ; j < SIZE; j++) {
+#pragma HLS PIPELINE
 				out.write(output_buffer[i][j]);
 			}
 		}
@@ -89,6 +90,7 @@ public:
 			LOAD_WEIGHTS_I: for (int i = 0; i < 3; i++) {
 				LOAD_WEIGHTS_J: for (int j = 0; j < 3; j++) {
 					LOAD_WEIGHTS_L: for (int l = 0; l < in_layers; l++) {
+#pragma HLS PIPELINE
 						buffer[((o & 0xf) << 7) | l][((o >> 4) << 4) | (i << 2) | j] = win.read();
 					}
 				}
@@ -100,6 +102,7 @@ public:
 		for (int i = 0; i < in_layers; i++) {
 			for (int j = 0; j < SIZE; j++) {
 				for (int k = 0; k < SIZE; k++) {
+#pragma HLS PIPELINE
 						buffer[((j&1)<<10)|i][(j>>1)*11 + k] = in.read();
 				}
 			}
@@ -141,6 +144,7 @@ public:
 		}
 
 		for (int l = 0; l < in_layers; l++) {
+#pragma HLS UNROLL
 			window[3*l+2] = 0;
 		}
 

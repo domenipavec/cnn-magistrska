@@ -25,7 +25,7 @@ void format_output(hls::stream<decimal_t> &in, hls::stream<stream_t> &out, int s
 void cnn(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights);
 void cnn_full_layer_stack(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights);
 void conv2d(hls::stream<decimal_t> &in, hls::stream<decimal_t> &out, hls::stream<decimal_t> &weights, int size, int in_layers, int out_layers, bool stream_weights);
-void cnn_general(hls::stream<stream_t> &in, hls::stream<stream_t> &out, int size, int in_layers, int out_layers, ap_uint<8> control);
+void cnn_general(hls::stream<stream_t> &in, hls::stream<stream_t> &out, int size, int in_layers, int out_layers, ap_uint<8> control, int &progress, int prsize);
 
 #include "cnn_impl.h"
 #include "cnn_class.h"

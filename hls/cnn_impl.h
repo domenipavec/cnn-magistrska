@@ -158,9 +158,11 @@ void direct(hls::stream<T> &in, hls::stream<T> &out, int size) {
 template <typename T, int ID>
 void split(hls::stream<T> &in, hls::stream<T> &out1, hls::stream<T> &out2, int size1, int size2) {
 	for (int i = 0; i < size1; i++) {
+#pragma HLS PIPELINE
 		out1.write(in.read());
 	}
 	for (int i = 0; i < size2; i++) {
+#pragma HLS PIPELINE
 		out2.write(in.read());
 	}
 }

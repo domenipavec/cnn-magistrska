@@ -9,7 +9,8 @@ import tensorflow as tf
 from darkflow.net.build import TFNet
 
 image = '../sample_img/sample_computer.jpg'
-output_c_file = "../vivado/cnn/cnn.sdk/cnnGeneral/src/image.h"
+cnn_c_file = "../vivado/cnn/cnn.sdk/cnnGeneral/src/image.h"
+cnn_software_c_file = "../vivado/cnn_software/cnn_software.sdk/cnn_software/src/image.h"
 
 tfnet = TFNet({"model": "tiny-yolo-voc.cfg", "load": "tiny-yolo-voc.weights"})
 
@@ -205,7 +206,7 @@ with tfnet.graph.as_default():
 
     biased9 = tf.nn.bias_add(conv9, layers[22].w['biases'])
 
-    output = tf.identity(maxpool3)
+    output = tf.identity(biased9)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -217,6 +218,9 @@ with tfnet.graph.as_default():
         img = np.expand_dims(img, 0)
 
         out = sess.run(output, {inpt: img})[0]
+        if out.shape[-1] == 125:
+            out = np.pad(out, ((0, 0), (0, 0), (0, 3)), 'constant')
+            print(out.shape)
 
         print(np.max(sess.run(maxpool1, {inpt: img})))
         print(np.max(sess.run(maxpool2, {inpt: img})))
@@ -231,7 +235,11 @@ with tfnet.graph.as_default():
             np.savetxt(output_file, img8bit.flatten(), fmt='%d')
             np.savetxt(output_file, out.flatten())
 
-        with open(output_c_file, "w") as cout:
+        with open(cnn_c_file, "w") as cout:
+            cout.write("unsigned char img[] = {};\n".format(number_array(img8bit.flatten())))
+            cout.write("float expected[] = {};\n".format(number_array(out.flatten())))
+
+        with open(cnn_software_c_file, "w") as cout:
             cout.write("unsigned char img[] = {};\n".format(number_array(img8bit.flatten())))
             cout.write("float expected[] = {};\n".format(number_array(out.flatten())))
 

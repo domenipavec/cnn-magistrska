@@ -144,7 +144,8 @@ int main() {
 				}
 			}
 
-			cnn_general(in, out, size, in_layers, out_layers, control);
+			int asdf;
+			cnn_general(in, out, size, in_layers, out_layers, control, asdf, 0);
 
 			for (int i = 0; i < out_size*out_size; i++) {
 				for (int o = 0; o < out_layers; o++) {
