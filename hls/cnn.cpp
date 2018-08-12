@@ -1,5 +1,6 @@
 #include "cnn.h"
 
+template <int ID>
 void sink(hls::stream<decimal_t> &in, int size) {
 	for (int i = 0; i < size; i++) {
 #pragma HLS PIPELINE

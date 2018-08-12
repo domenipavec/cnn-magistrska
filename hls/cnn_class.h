@@ -5,7 +5,6 @@ class ConvClass {
 private:
 // dimensions: y, l + x*layers
 	T line_buffer[2][MAX_LINE];
-	T window[3*MAX_IN_LAYERS];
 	T buffer[2048][66];
 	T output_buffer[SIZE][SIZE];
 	int in_layers;
@@ -116,6 +115,8 @@ public:
 	}
 
 	void convolute(hls::stream<T> &in, hls::stream<T> &out) {
+		T window[3][MAX_IN_LAYERS];
+#pragma HLS ARRAY_PARTITION variable=window complete dim=1
 
 		INIT_2LINES: for (int i = 0; i < 2; i++) {
 			INIT_WIDTH: for (int j = 0; j < size; j++) {
@@ -144,18 +145,17 @@ public:
 		}
 
 		for (int l = 0; l < in_layers; l++) {
-#pragma HLS UNROLL
-			window[3*l+2] = 0;
+			window[2][l] = 0;
 		}
 
 		CONV_HEIGHT: for (int i = 0; i < size; i++) {
 			CONV_WIDTH: for (int j = 0; j <= size; j++) {
 				T sum[MAX_OUT_LAYERS];
 				for (int o = 0; o < out_layers; o++) {
+#pragma HLS UNROLL
 					sum[o] = T(0);
 				}
 				CONV_LAYERS: for (int l = 0; l < in_layers; l++) {
-#pragma HLS PIPELINE
 					T v(0);
 					if (j < size && i < size - 1) {
 						v = in.read();
@@ -179,15 +179,21 @@ public:
 						next_window = line_buffer[0][idx];
 					}
 					for (int k = 0; k < 2; k++) {
-						window[3*l+k] = window[3*l+k+1];
+#pragma HLS UNROLL
+						window[k][l] = window[k+1][l];
 					}
-					window[3*l+2] = next_window;
+					window[2][l] = next_window;
 
 					// sum window (first) row
-					for (int k = 0; k < 3; k++) {
-						for (int o = 0; o < out_layers; o++) {
-							sum[o] += window[3*l+k]*buffer[((o & 0xf) << 7) | l][((o >> 4) << 4) | (0 << 2) | k];
+
+					for (int o = 0; o < out_layers; o++) {
+#pragma HLS PIPELINE
+						T psum = 0;
+						for (int k = 0; k < 3; k++) {
+#pragma HLS UNROLL
+							psum += window[k][l]*buffer[((o & 0xf) << 7) | l][((o >> 4) << 4) | (0 << 2) | k];
 						}
+						sum[o] += psum;
 					}
 
 					// sum other two rows
@@ -215,10 +221,15 @@ public:
 						// partial sum for optimize summing
 //							T psum(0);
 
-						PC_K: for (int k = 0; k < 3; k++) {
-							for (int o = 0; o < out_layers; o++) {
-								sum[o] += tmp[k]*buffer[((o & 0xf) << 7) | l][((o >> 4) << 4) | ((m+1) << 2) | k];
+
+						for (int o = 0; o < out_layers; o++) {
+#pragma HLS PIPELINE
+							T psum = 0;
+							PC_K: for (int k = 0; k < 3; k++) {
+#pragma HLS UNROLL
+								psum += tmp[k]*buffer[((o & 0xf) << 7) | l][((o >> 4) << 4) | ((m+1) << 2) | k];
 							}
+							sum[o] += psum;
 						}
 //							suml += psum;
 					}
@@ -226,6 +237,7 @@ public:
 				}
 				if (j != 0) {
 					for (int o = 0; o < out_layers; o++) {
+#pragma HLS PIPELINE
 						out.write(sum[o]);
 					}
 				}
