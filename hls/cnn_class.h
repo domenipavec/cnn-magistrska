@@ -6,7 +6,7 @@ private:
 // dimensions: y, l + x*layers
 	T line_buffer[2][MAX_LINE];
 	T buffer[2048][66];
-	T output_buffer[SIZE][SIZE];
+
 	int in_layers;
 	int out_layers;
 	int lshift;
@@ -14,15 +14,16 @@ private:
 
 protected:
 	void run_1output(hls::stream<T> &win, hls::stream<T> &out) {
+		T output_buffer[SIZE][SIZE];
+#pragma HLS ARRAY_PARTITION variable=output_buffer complete dim=2
+
 		INIT_I: for (int i = 0; i < SIZE; i++) {
-#pragma HLS UNROLL
+#pragma HLS PIPELINE
 			INIT_J: for (int j = 0; j < SIZE; j++) {
 #pragma HLS UNROLL
 				output_buffer[i][j] = 0;
 			}
 		}
-
-
 
 		CONV_L: for (int l = -1; l <= 1; l++) {
 			CONV_M: for (int m = -1; m <= 1; m++) {
@@ -30,8 +31,9 @@ protected:
 					T weight = win.read();
 
 					APPLY_WEIGHT_J: for (int j = 0; j < SIZE; j++) {
-						APPLY_WEIGHT_K: for (int k = 0; k < SIZE; k++) {
 #pragma HLS PIPELINE
+						APPLY_WEIGHT_K: for (int k = 0; k < SIZE; k++) {
+#pragma HLS UNROLL
 							T value;
 							if (j+l >= 0 && j+l < SIZE && k+m >= 0 && k+m < SIZE) {
 								value = buffer[(((j+l)&1)<<10)|i][((j+l)>>1)*11 + k+m];
