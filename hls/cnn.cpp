@@ -105,27 +105,27 @@ void cnn_general(hls::stream<stream_t> &in, hls::stream<stream_t> &out, int size
 //	assert(max_type == 0);
 
 	hls::stream<decimal_t> non_axi_in("non_axi_in");
-#pragma HLS STREAM variable=non_axi_in depth=1 dim=1
+#pragma HLS STREAM variable=non_axi_in depth=128 dim=1
 	hls::stream<decimal_t> non_axi_in1("non_axi_in1");
-#pragma HLS STREAM variable=non_axi_in1 depth=1 dim=1
+#pragma HLS STREAM variable=non_axi_in1 depth=128 dim=1
 	hls::stream<decimal_t> non_axi_out("non_axi_out");
-#pragma HLS STREAM variable=non_axi_out depth=1 dim=1
+#pragma HLS STREAM variable=non_axi_out depth=128 dim=1
 
 	hls::stream<decimal_t> conv_out("conv_out");
-#pragma HLS STREAM variable=conv_out depth=1 dim=1
+#pragma HLS STREAM variable=conv_out depth=128 dim=1
 	hls::stream<decimal_t> batch_out("batch_out");
-#pragma HLS STREAM variable=batch_out depth=1 dim=1
+#pragma HLS STREAM variable=batch_out depth=128 dim=1
 	hls::stream<decimal_t> leaky_out("leaky_out");
-#pragma HLS STREAM variable=leaky_out depth=1 dim=1
+#pragma HLS STREAM variable=leaky_out depth=128 dim=1
 
 	hls::stream<decimal_t> weights_data("weights_data");
-#pragma HLS STREAM variable=weights_data depth=1 dim=1
+#pragma HLS STREAM variable=weights_data depth=128 dim=1
 	hls::stream<decimal_t> scale_add("scale_add");
-#pragma HLS STREAM variable=scale_add depth=1 dim=1
+#pragma HLS STREAM variable=scale_add depth=128 dim=1
 	hls::stream<decimal_t> weights("weights");
-#pragma HLS STREAM variable=weights depth=1 dim=1
+#pragma HLS STREAM variable=weights depth=128 dim=1
 	hls::stream<decimal_t> data("data");
-#pragma HLS STREAM variable=data depth=1 dim=1
+#pragma HLS STREAM variable=data depth=128 dim=1
 
 	parse_input(in, non_axi_in, weights_size+scale_add_size, in_size, control.get_bit(CTRL_8BITIN));
 
