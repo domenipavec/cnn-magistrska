@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import os
+import random
+import shutil
 import time
 
 import numpy as np
@@ -29,6 +31,11 @@ def resize_input(im):
 
 
 tfnet = TFNet({"model": "tiny-yolo-voc.cfg", "load": "tiny-yolo-voc.weights"})
+
+shutil.rmtree('detections-tf', ignore_errors=True)
+shutil.rmtree('groundtruths-tf', ignore_errors=True)
+os.mkdir('detections-tf')
+os.mkdir('groundtruths-tf')
 
 with tfnet.graph.as_default():
     layers = tfnet.darknet.layers
@@ -216,8 +223,12 @@ with tfnet.graph.as_default():
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
-        for i, img_file in enumerate(_iterate_files()):
+        files = list(_iterate_files())
+        random.shuffle(files)
+        for i, img_file in enumerate(files):
             start_time = time.time()
+
+            fid = img_file.split('/')[-1][:-4]
 
             orig_img = cv2.imread(img_file)
             if orig_img is None:
@@ -232,7 +243,7 @@ with tfnet.graph.as_default():
             threshold = 0
             boxes = tfnet.framework.findboxes(out)
 
-            with open('detections-tf/{}.txt'.format(img_file.split('/')[-1][:-4]), 'w') as fout:
+            with open('detections-tf/{}.txt'.format(fid), 'w') as fout:
                 for box in boxes:
                     box = tfnet.framework.process_box(box, h, w, threshold)
                     if not box:
@@ -241,5 +252,7 @@ with tfnet.graph.as_default():
                     left, right, top, bottom, cls, idx, prob = box
 
                     fout.write(' '.join(str(x) for x in [cls, prob, left, top, right, bottom]) + '\n')
+
+            shutil.copyfile('groundtruths/{}.txt'.format(fid), 'groundtruths-tf/{}.txt'.format(fid))
 
             print(i, time.time() - start_time)

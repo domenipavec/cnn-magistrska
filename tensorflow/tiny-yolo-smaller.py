@@ -261,6 +261,7 @@ with tfnet.graph.as_default():
                 cv2.putText(orig_img, box[4], (box[0], box[2]), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
             cv2.imshow('image', orig_img)
+            cv2.imwrite(img_file+'.output.jpg', orig_img)
 
             print(time.time() - start_time)
 
